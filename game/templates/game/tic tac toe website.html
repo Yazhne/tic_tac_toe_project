@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Tic Tac Toe Ultimate</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+/* ========== GENERAL ========== */
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Comic Sans MS', cursive;
+    background: radial-gradient(circle at top, #0f2027, #203a43, #2c5364);
+    color: white;
+}
+
+.page {
+    display: none;
+    min-height: 100vh;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    padding: 15px;
+}
+
+.active { display: flex; }
+
+.card {
+    background: rgba(255,255,255,0.08);
+    padding: 25px;
+    border-radius: 22px;
+    box-shadow: 0 0 30px #00ffff;
+    text-align: center;
+    max-width: 95%;
+}
+
+input {
+    width: 260px;
+    max-width: 90%;
+    padding: 12px;
+    margin: 6px 0;
+    border-radius: 12px;
+    border: none;
+    font-size: 16px;
+}
+
+button {
+    padding: 12px 25px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(90deg,#ff0080,#7928ca);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 0 15px #ff0080;
+    margin: 6px;
+}
+
+button:hover { transform: scale(1.08); }
+
+/* ========== LOGIN ========== */
+#login .card {
+    animation: glow 2s infinite alternate;
+}
+
+@keyframes glow {
+    from { box-shadow: 0 0 20px #ff0080; }
+    to { box-shadow: 0 0 40px #00ffff; }
+}
+
+/* ========== HOME ========== */
+.top-right {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-weight: bold;
+}
+
+.scoreboard {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.score-card {
+    background: linear-gradient(145deg,#0f2027,#203a43);
+    padding: 15px;
+    border-radius: 16px;
+    box-shadow: 0 0 18px #00ffff;
+    min-width: 150px;
+}
+
+/* ========== GAME ========== */
+.board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(80px, 120px));
+    gap: 12px;
+    margin: 15px;
+}
+
+.cell {
+    width: 100%;
+    aspect-ratio: 1;
+    font-size: 55px;
+    border-radius: 18px;
+    background: linear-gradient(145deg,#ffffff,#e6e6e6);
+    cursor: pointer;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+.cell.X { color: #ff4b5c; }
+.cell.O { color: #4facfe; }
+
+.winner {
+    font-size: 22px;
+    margin: 10px;
+}
+
+.game-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ========== WIN EFFECT ========== */
+.win {
+    animation: winPulse 0.7s infinite alternate;
+    background: linear-gradient(145deg,#00ffcc,#00c6ff) !important;
+}
+
+@keyframes winPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.15); box-shadow: 0 0 30px #00ffff; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- 🔊 SOUNDS -->
+<audio id="clickSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<audio id="winSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+<audio id="drawSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+
+<!-- LOGIN -->
+<div id="login" class="page active">
+    <div class="card">
+        <h2>🎮 Player Login</h2>
+        <input id="username" placeholder="Username">
+        <input id="email" placeholder="Email">
+        <button onclick="login()">Enter</button>
+    </div>
+</div>
+
+<!-- HOME -->
+<div id="home" class="page">
+    <div class="top-right" id="userDisplay"></div>
+
+    <div class="card">
+        <h2>Select Mode</h2>
+        <button onclick="setMode(1)">One Player</button>
+        <button onclick="setMode(2)">Two Player</button>
+
+        <div id="players"></div>
+
+        <div class="scoreboard">
+            <div class="score-card">
+                <h3 id="p1Name">Player 1</h3>
+                <p>Score: <span id="p1Score">0</span></p>
+            </div>
+            <div class="score-card">
+                <h3 id="p2Name">Player 2</h3>
+                <p>Score: <span id="p2Score">0</span></p>
+            </div>
+        </div>
+
+        <button onclick="startGame()">Start Game</button>
+    </div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="page">
+    <div class="board" id="board"></div>
+    <div class="winner" id="winner"></div>
+
+    <div class="game-buttons">
+        <button onclick="restart()">🔄 Replay</button>
+        <button onclick="goHome()">🏠 Home</button>
+    </div>
+</div>
+
+<script>
+/* ================== VARIABLES ================== */
+let mode, p1="", p2="AI";
+let p1Mark='X', p2Mark='O';
+let turn, gameOver=false;
+let score1=localStorage.getItem("s1")?+localStorage.getItem("s1"):0;
+let score2=localStorage.getItem("s2")?+localStorage.getItem("s2"):0;
+
+/* ================== HELPERS ================== */
+const clickSound=()=>document.getElementById("clickSound").play();
+const winSound=()=>document.getElementById("winSound").play();
+const drawSound=()=>document.getElementById("drawSound").play();
+
+function show(id){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+/* ================== LOGIN ================== */
+function login(){
+    if(!username.value || !email.value) return alert("Fill all fields");
+    userDisplay.textContent=username.value;
+    show('home');
+    updateScores();
+}
+
+/* ================== MODE ================== */
+function setMode(m){
+    mode=m;
+    players.innerHTML = m===2 ?
+    `
+    <input id="p1" placeholder="Player 1 Name">
+    <input id="p1m" placeholder="Player 1 Mark (X/O)">
+    <input id="p2" placeholder="Player 2 Name">
+    <input id="p2m" placeholder="Player 2 Mark (X/O)">
+    ` :
+    `
+    <input id="p1" placeholder="Your Name">
+    <input id="p1m" placeholder="Your Mark (X/O)">
+    `;
+}
+
+/* ================== START ================== */
+function startGame(){
+    p1=p1?.value || document.getElementById("p1").value;
+    p1Mark=document.getElementById("p1m").value.toUpperCase();
+    if(!['X','O'].includes(p1Mark)) return alert("Invalid mark");
+
+    if(mode===2){
+        p2=document.getElementById("p2").value;
+        p2Mark=document.getElementById("p2m").value.toUpperCase();
+        if(p1Mark===p2Mark) return alert("Marks must differ");
+    } else {
+        p2="AI";
+        p2Mark=p1Mark==='X'?'O':'X';
+    }
+
+    p1Name.textContent=p1;
+    p2Name.textContent=p2;
+    turn=p1Mark;
+    initBoard();
+    show('game');
+}
+
+/* ================== BOARD ================== */
+function initBoard(){
+    board.innerHTML='';
+    gameOver=false;
+    winner.textContent='';
+    for(let i=0;i<9;i++){
+        const c=document.createElement("button");
+        c.className="cell";
+        c.onclick=()=>play(c);
+        board.appendChild(c);
+    }
+    if(mode===1 && turn===p2Mark) aiMove();
+}
+
+function play(cell){
+    if(cell.textContent||gameOver) return;
+    clickSound();
+    cell.textContent=turn;
+    cell.classList.add(turn);
+    if(checkWin()) return;
+    turn = turn===p1Mark?p2Mark:p1Mark;
+    if(mode===1 && turn===p2Mark) setTimeout(aiMove,400);
+}
+
+/* ================== SMART AI ================== */
+function aiMove(){
+    let bestScore=-Infinity, move;
+    const cells=[...document.querySelectorAll(".cell")];
+    cells.forEach((c,i)=>{
+        if(!c.textContent){
+            c.textContent=p2Mark;
+            let score=minimax(false);
+            c.textContent='';
+            if(score>bestScore){ bestScore=score; move=c; }
+        }
+    });
+    play(move);
+}
+
+function minimax(isMax){
+    const result=evaluate();
+    if(result!==null) return result;
+    let best=isMax?-Infinity:Infinity;
+    document.querySelectorAll(".cell").forEach(c=>{
+        if(!c.textContent){
+            c.textContent=isMax?p2Mark:p1Mark;
+            let score=minimax(!isMax);
+            c.textContent='';
+            best=isMax?Math.max(best,score):Math.min(best,score);
+        }
+    });
+    return best;
+}
+
+function evaluate(){
+    const c=[...document.querySelectorAll(".cell")];
+    const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(let a of w){
+        if(c[a[0]].textContent &&
+           c[a[0]].textContent===c[a[1]].textContent &&
+           c[a[1]].textContent===c[a[2]].textContent){
+            return c[a[0]].textContent===p2Mark?1:-1;
+        }
+    }
+    return [...c].every(c=>c.textContent)?0:null;
+}
+
+/* ================== WIN ================== */
+function checkWin(){
+    const c=[...document.querySelectorAll(".cell")];
+    const w=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for(let a of w){
+        if(c[a[0]].textContent &&
+           c[a[0]].textContent===c[a[1]].textContent &&
+           c[a[1]].textContent===c[a[2]].textContent){
+            gameOver=true;
+            a.forEach(i=>c[i].classList.add("win"));
+            winSound();
+            if(c[a[0]].textContent===p1Mark){ score1+=10; localStorage.setItem("s1",score1); }
+            else { score2+=10; localStorage.setItem("s2",score2); }
+            updateScores();
+            winner.textContent=(c[a[0]].textContent===p1Mark?p1:p2)+" Wins! 🎉";
+            return true;
+        }
+    }
+    if([...c].every(c=>c.textContent)){
+        drawSound();
+        winner.textContent="Draw 🤝";
+        gameOver=true;
+    }
+    return false;
+}
+
+function updateScores(){
+    p1Score.textContent=score1;
+    p2Score.textContent=score2;
+}
+
+function restart(){ initBoard(); }
+function goHome(){ show("home"); }
+</script>
+
+</body>
+</html>
